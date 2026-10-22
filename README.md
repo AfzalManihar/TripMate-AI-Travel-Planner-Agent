@@ -37,6 +37,13 @@ Instead of relying on a single LLM call, the project uses a multi-agent workflow
 
 The application combines a FastAPI backend, LangGraph-based agent orchestration, MCP tool integrations, and a web interface to explore an agent-driven travel planning workflow.
 
+---
+
+[🌐 **Live Demo — Try TripMate AI**](https://tripmate-ai-travel-planner-agent.onrender.com/)
+
+---
+
+**From travel ideas to structured itineraries — powered by AI agents, tool integrations, and workflow orchestration.**
 ### 🎯 Project Goal
 
 Build a practical AI application that demonstrates how multiple specialized agents and external tools can work together to solve a real-world planning problem.
@@ -154,8 +161,8 @@ Install the following before running the project:
 If your project is hosted on GitHub:
 
 ```bash
-git clone <YOUR_REPOSITORY_URL>
-cd <YOUR_PROJECT_FOLDER>
+git clone <https://github.com/AfzalManihar/TripMate-AI-Travel-Planner-Agent.git>
+cd <TripMate-AI-Travel-Planner-Agent>
 ```
 
 Alternatively, open your existing project folder in VS Code.

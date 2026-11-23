@@ -13,8 +13,10 @@ import asyncio
 import json
 import psycopg
 from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command, interrupt
 from langchain_core.messages import (
     AnyMessage,
@@ -40,7 +42,7 @@ def get_database_url():
     if not database_url:
         raise ValueError(
             "DATABASE_URL is missing. "
-            "Please add your Render PostgreSQL External Database URL to .env"
+            "Please add your Neon PostgreSQL connection string to .env / Render env vars"
         )
 
     if "sslmode=" not in database_url:
@@ -717,16 +719,38 @@ graph.add_edge("final_agent", END)
 graph.add_edge("guardrail_blocked", END)
 
 # =========================
-# PostgreSQL Checkpointer - original persistence kept
+# PostgreSQL Checkpointer (Neon) - pooled + safe fallback
 # =========================
-DATABASE_URL = get_database_url()
-_conn = psycopg.connect(
-    DATABASE_URL,
-    autocommit=True,
-    row_factory=dict_row,
-)
-checkpointer = PostgresSaver(_conn)
-checkpointer.setup()
+# Neon free tier suspends idle compute, which kills long-lived connections.
+# A connection pool with check_connection transparently replaces dead ones.
+# If the database is unreachable at startup, fall back to in-memory state so
+# the app still boots (state is then lost on restart).
+try:
+    DATABASE_URL = get_database_url()
+    _pool = ConnectionPool(
+        conninfo=DATABASE_URL,
+        min_size=1,
+        max_size=5,
+        kwargs={
+            "autocommit": True,
+            "row_factory": dict_row,
+            "prepare_threshold": 0,
+            "connect_timeout": 15,
+        },
+        check=ConnectionPool.check_connection,
+        open=True,
+    )
+    _pool.wait(timeout=30)
+    checkpointer = PostgresSaver(_pool)
+    checkpointer.setup()
+    print("Postgres checkpointer connected", flush=True)
+except Exception as exc:
+    print(
+        f"Postgres unavailable ({type(exc).__name__}: {exc}). "
+        "Falling back to in-memory checkpointer.",
+        flush=True,
+    )
+    checkpointer = MemorySaver()
 
 travel_graph = graph.compile(checkpointer=checkpointer)
 
